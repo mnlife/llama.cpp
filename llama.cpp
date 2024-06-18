@@ -3860,6 +3860,7 @@ static const char * llama_model_arch_name(llm_arch arch) {
     return it->second;
 }
 
+
 static std::string llama_model_ftype_name(llama_ftype ftype) {
     if (ftype & LLAMA_FTYPE_GUESSED) {
         return llama_model_ftype_name((enum llama_ftype) (ftype & ~LLAMA_FTYPE_GUESSED)) + " (guessed)";
@@ -4762,7 +4763,6 @@ static void llm_load_vocab(
     for (uint32_t i = 0; i < n_vocab; i++) {
         std::string word = gguf_get_arr_str(ctx, token_idx, i);
         GGML_ASSERT(unicode_cpts_from_utf8(word).size() > 0);
-
         vocab.token_to_id[word] = i;
 
         auto & token_data = vocab.id_to_token[i];
@@ -12477,7 +12477,6 @@ static int llama_decode_internal(
             ggml_backend_t backend_res = ggml_backend_sched_get_tensor_backend(lctx.sched, res);
             GGML_ASSERT(backend_res != nullptr);
             GGML_ASSERT(lctx.logits != nullptr);
-
             float * logits_out = lctx.logits + n_outputs_prev*n_vocab;
             const int32_t n_outputs_new = lctx.n_outputs;
 
@@ -18300,7 +18299,12 @@ int32_t llama_tokenize(
                      int32_t   n_tokens_max,
                         bool   add_special,
                         bool   parse_special) {
-    auto res = llama_tokenize_internal(model->vocab, std::string(text, text_len), add_special, parse_special);
+    auto arch_name = llama_model_arch_name(model->arch);
+    auto prompt = std::move(std::string(text, text_len));
+    if (strcmp(arch_name, "chatglm") == 0) {
+        prompt = "[gMASK]sop<|{role}|>\n" + prompt + "<|assistant|>";
+    }
+    auto res = llama_tokenize_internal(model->vocab, prompt, add_special, parse_special);
 
     if (n_tokens_max < (int) res.size()) {
         // LLAMA_LOG_ERROR("%s: too many tokens\n", __func__);

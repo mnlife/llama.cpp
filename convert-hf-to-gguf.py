@@ -2731,7 +2731,8 @@ class ChatGLMModel(Model):
         tokenizer = AutoTokenizer.from_pretrained(dir_model, trust_remote_code=True)
         vocab_size = hparams.get("padded_vocab_size", len(tokenizer.get_vocab()))
         assert max(tokenizer.get_vocab().values()) < vocab_size
-
+        role_special_tokens = ["<|system|>", "<|user|>", "<|assistant|>", "<|observation|>"]
+        special_tokens = ["[MASK]", "[gMASK]", "[sMASK]", "sop", "eop"] + role_special_tokens
         for token_id in range(vocab_size):
             piece = tokenizer._convert_id_to_token(token_id)
             if token_id == 0:
@@ -2740,7 +2741,6 @@ class ChatGLMModel(Model):
                 piece = "<bos>"
             elif token_id == 2:
                 piece = "<eos>"
-
             text = piece.encode("utf-8")
             score = 0.0
             # Referencing the tokenizer Python implementation(https://huggingface.co/THUDM/chatglm3-6b/blob/main/tokenization_chatglm.py),
@@ -2752,7 +2752,12 @@ class ChatGLMModel(Model):
                 text = f"[PAD{token_id}]".encode("utf-8")
 
             if token_id >= tokenizer.tokenizer.sp_model.vocab_size():
-                toktype = SentencePieceTokenTypes.UNKNOWN
+                if piece in special_tokens:
+                    # show special tokens in prompt
+                    toktype = SentencePieceTokenTypes.USER_DEFINED
+                else:
+                    print(f"unknow token: {piece}")
+                    toktype = SentencePieceTokenTypes.UNKNOWN
                 tokens.append(text)
                 scores.append(score)
                 toktypes.append(toktype)
@@ -2767,7 +2772,6 @@ class ChatGLMModel(Model):
                 toktype = SentencePieceTokenTypes.UNUSED
             elif tokenizer.tokenizer.sp_model.is_byte(token_id):
                 toktype = SentencePieceTokenTypes.BYTE
-
             tokens.append(text)
             scores.append(score)
             toktypes.append(toktype)
@@ -2776,7 +2780,6 @@ class ChatGLMModel(Model):
         self.gguf_writer.add_token_list(tokens)
         self.gguf_writer.add_token_scores(scores)
         self.gguf_writer.add_token_types(toktypes)
-
         special_vocab = gguf.SpecialVocab(self.dir_model, n_vocab=len(tokens))
         special_vocab.add_to_gguf(self.gguf_writer)
 
@@ -2872,7 +2875,7 @@ def parse_args() -> argparse.Namespace:
         help="model is executed on big endian machine",
     )
     parser.add_argument(
-        "model", type=Path,
+        "--model", type=Path,
         help="directory containing model file",
     )
     parser.add_argument(
