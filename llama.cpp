@@ -18302,7 +18302,7 @@ int32_t llama_tokenize(
     auto arch_name = llama_model_arch_name(model->arch);
     auto prompt = std::move(std::string(text, text_len));
     if (strcmp(arch_name, "chatglm") == 0) {
-        prompt = "[gMASK]sop<|{role}|>\n" + prompt + "<|assistant|>";
+        prompt = "[gMASK]sop<|user|>\n" + prompt + "<|assistant|>";
     }
     auto res = llama_tokenize_internal(model->vocab, prompt, add_special, parse_special);
 
